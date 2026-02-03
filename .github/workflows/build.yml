@@ -1,3 +1,4 @@
+# Build Android APK - installs Android SDK command-line tools and build-tools (contains aidl)
 name: Build Android APK
 on: [push, pull_request]
 
@@ -18,14 +19,48 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install apt dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev
+          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev unzip wget curl git
           python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install Android SDK command-line tools and build-tools
+        run: |
+          set -e
+          # Make SDK path match buildozer expectations
+          SDK_ROOT="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          # download latest command line tools (adjust version/url if needed)
+          curl -fSL "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip" -o /tmp/cmdline.zip
+          unzip -q /tmp/cmdline.zip -d /tmp/cmdline
+          mkdir -p "$SDK_ROOT/cmdline-tools/latest"
+          mv /tmp/cmdline/cmdline-tools/* "$SDK_ROOT/cmdline-tools/latest/" || true
+
+          # Pre-accept licenses to avoid interactive prompts
+          mkdir -p "$SDK_ROOT/licenses"
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_ROOT/licenses/android-sdk-license"
+          echo "84831b9409646a918e30573bab4c9c91346d8ab2" >> "$SDK_ROOT/licenses/android-sdk-license"
+
+          export PATH="$SDK_ROOT/cmdline-tools/latest/bin:$SDK_ROOT/platform-tools:$PATH"
+          # Accept licenses (some sdkmanager commands still prompt; yes piped as fallback)
+          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" --licenses || true
+          # Install platform-tools, a platform and build-tools with aidl included
+          "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-30" "build-tools;30.0.3"
+
+          # Export environment variables for subsequent steps
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$SDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$SDK_ROOT/cmdline-tools/latest/bin:$SDK_ROOT/platform-tools:$PATH" >> $GITHUB_ENV
+
+      - name: Install Python packages
+        run: |
           python -m pip install buildozer cython
 
       - name: Build with Buildozer
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: |
           cd $GITHUB_WORKSPACE
           buildozer android release
@@ -34,4 +69,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CoreElite-APK
-          path: bin/*.apk
+          path: bin/*.apk          path: bin/*.apk
