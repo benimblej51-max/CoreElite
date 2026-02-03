@@ -69,4 +69,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CoreElite-APK
-          path: bin/*.apk          path: bin/*.apk
+          path: path: bin/*.apk
