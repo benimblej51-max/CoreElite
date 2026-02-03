@@ -8,8 +8,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build with Buildozer
-        # This v1.2 version fixed the 'invalid user: user' bug
-        uses: ArtemSBulgakov/buildozer-action@v1.2
+        # This uses the specific fix for the 'chown' error
+        uses: ArtemSBulgakov/buildozer-action@8627e77
         with:
           buildozer_version: stable
 
